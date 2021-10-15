@@ -8,7 +8,8 @@ aromatic_atoms = {
     'PHE': ['CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'HD1', 'HD2', 'HE1', 'HE2', 'HZ'],
     'TYR': ['CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'HD1', 'HD2', 'HE1', 'HE2', 'HH'],
     'TRP': ['CD2', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2', 'HE3', 'HZ2', 'HZ3', 'HH2', 'HE1'],
-    'HIS': ['CG', 'ND1', 'CD2', 'CE1', 'NE2', 'HD1', 'HD2', 'HE1', 'HE2', 'xx', 'yy']  # if needed un comment
+    'W7F': ['CD2', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2', 'HE3', 'HZ2', 'HZ3', 'HH2', 'HE1'],
+    #'HIS': ['CG', 'ND1', 'CD2', 'CE1', 'NE2', 'HD1', 'HD2', 'HE1', 'HE2', 'xx', 'yy']  # if needed un comment
 }
 
 
@@ -28,6 +29,14 @@ def get_coordinates(cif_file, use_auth_tag=False,nmrbox=False):
     pRd.read(cif_data)
     ifh.close()
     c0 = cif_data[0]
+    seq_info = c0.getObj('entity_poly')
+    c_names=seq_info.getAttributeList()
+    ch_id = c_names.index('pdbx_strand_id')
+    sq_id=c_names.index('pdbx_seq_one_letter_code')
+    sq_info={}
+    for d in seq_info.getRowList():
+        sq_info[d[ch_id]]=(len(d[sq_id]),d[sq_id].count('W'))
+    print (sq_info)
     atom_site = c0.getObj('atom_site')
     max_models = int(atom_site.getValue('pdbx_PDB_model_num', -1))
     col_names = atom_site.getAttributeList()
@@ -68,30 +77,34 @@ def get_coordinates(cif_file, use_auth_tag=False,nmrbox=False):
                        pdb[(dat[seq_id], dat[asym_id], dat[comp_id], dat[atom_id])] = numpy.array([float(dat[x_id]), float(dat[y_id]), float(dat[z_id])])
         pdb_models[model] = pdb
         atom_ids[model] = aid
-    return pdb_models, atom_ids
+    return pdb_models, atom_ids, sq_info
 
 
-def get_pdb_data(pdb_id, auth_tag=False, nmrbox=False):
-    if nmrbox:
-        try:
-            cif_file_path = '/reboxitory/2021/07/PDB/data/structures/all/mmCIF/{}.cif.gz'.format(pdb_id.lower())
-            pdb_data = get_coordinates(cif_file_path,auth_tag,nmrbox=nmrbox)
-        except FileNotFoundError:
-            pdb_data = None
+def get_pdb_data(pdb_id, auth_tag=False, nmrbox=False, local_file=False):
+    if local_file:
+        pdb_data, ar_residues, sq_info = get_coordinates(pdb_id, auth_tag)
     else:
-        if not os.path.isdir('./data'):
-            os.system('mkdir ./data')
-        if not os.path.isdir('./data/PDB'):
-            os.system('mkdir ./data/PDB')
-        cif_file = './data/PDB/{}.cif'.format(pdb_id)
-        if not os.path.isfile(cif_file):
-            cmd = 'wget https://files.rcsb.org/download/{}.cif -O ./data/PDB/{}.cif'.format(pdb_id, pdb_id)
-            os.system(cmd)
-        pdb_data,ar_residues = get_coordinates('./data/PDB/{}.cif'.format(pdb_id),auth_tag)
-    return pdb_data, ar_residues
+        if nmrbox:
+            try:
+                cif_file_path = '/reboxitory/2021/07/PDB/data/structures/all/mmCIF/{}.cif.gz'.format(pdb_id.lower())
+                pdb_data, ar_residues,sq_info = get_coordinates(cif_file_path,auth_tag,nmrbox=nmrbox)
+            except FileNotFoundError:
+                pdb_data, ar_residues = None, None
+        else:
+            if not os.path.isdir('./data'):
+                os.system('mkdir ./data')
+            if not os.path.isdir('./data/PDB'):
+                os.system('mkdir ./data/PDB')
+            cif_file = './data/PDB/{}.cif'.format(pdb_id)
+            if not os.path.isfile(cif_file):
+                cmd = 'wget https://files.rcsb.org/download/{}.cif -O ./data/PDB/{}.cif'.format(pdb_id, pdb_id)
+                os.system(cmd)
+            pdb_data,ar_residues,sq_info = get_coordinates('./data/PDB/{}.cif'.format(pdb_id),auth_tag)
+    return pdb_data, ar_residues, sq_info
 
 
 if __name__ == "__main__":
-    x,y=get_pdb_data('4NIO')
+    x,y,z=get_pdb_data('3K0N')
     print (x)
     print (y)
+    print(z)
